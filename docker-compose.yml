@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8081:3000"
+    depends_on:
+      - api
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - /app/node_modules
+      - ./client:/app  
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8081:5000"         
+    volumes:
+      - /app/node_modules
+      - ./server:/app
+    environment:
+       DB_HOST: postgres
+       DB_USER: amine
+       DB_PASSWORD: mastouri
+       DB_NAME: my_db
+       REDIS_HOST: redis
+       REDIS_PORT: 6379
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - backend  
+
+
+  redis:
+    image: redis:latest
+    restart: always
+    networks:
+      - backend  
+
+
+
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+       POSTGRES_USER: amine
+       POSTGRES_PASSWORD: mastouri
+       POSTGRES_DB: my_db
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - backend  
+
+  worker:
+    build: 
+      context: ./worker
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    networks:
+      - backend
+networks:
+  backend:
+  frontend:
+
+volumes:
+  pg_data: 
+  
