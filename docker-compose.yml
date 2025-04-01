@@ -6,16 +6,28 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile.dev
-    ports:
-      - "8081:3000"
     depends_on:
       - api
     networks:
       - frontend
       - backend
     volumes:
-      - /app/node_modules
-      - ./client:/app  
+      - ./client:/app
+      - /app/node_modules  
+
+  nginx:
+    restart: always
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+      - client  
+    networks:
+      - frontend
+      - backend  
 
   api:
     build:
@@ -24,21 +36,21 @@ services:
     ports:
       - "8081:5000"         
     volumes:
-      - /app/node_modules
       - ./server:/app
+      - /app/node_modules
     environment:
-       DB_HOST: postgres
+       DB_HOST: pg
        DB_USER: amine
        DB_PASSWORD: mastouri
        DB_NAME: my_db
        REDIS_HOST: redis
        REDIS_PORT: 6379
+       
     depends_on:
       - redis
-      - postgres
+      - pg
     networks:
       - backend  
-
 
   redis:
     image: redis:latest
@@ -46,9 +58,7 @@ services:
     networks:
       - backend  
 
-
-
-  postgres:
+  pg:
     image: postgres:15
     restart: always
     environment:
@@ -71,10 +81,13 @@ services:
       REDIS_PORT: 6379
     networks:
       - backend
+    volumes:
+      - /app/node_modules
+      - ./worker:/app  
+
 networks:
   backend:
   frontend:
 
 volumes:
-  pg_data: 
-  
+  pg_data:  
