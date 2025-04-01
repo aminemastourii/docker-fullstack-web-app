@@ -1,5 +1,4 @@
-version: '3.8'
-
+version: "3.8"
 services:
 
   client:
@@ -39,16 +38,19 @@ services:
       - ./server:/app
       - /app/node_modules
     environment:
-       DB_HOST: pg
-       DB_USER: amine
-       DB_PASSWORD: mastouri
-       DB_NAME: my_db
+       PGUSER: amine
+       PGHOST: pg
+       PGDATABASE: my_db
+       PGPASSWORD: mastouri
+       PGPORT: 5432
        REDIS_HOST: redis
        REDIS_PORT: 6379
        
     depends_on:
-      - redis
-      - pg
+      pg:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - backend  
 
@@ -59,14 +61,17 @@ services:
       - backend  
 
   pg:
-    image: postgres:15
+    image: postgres:latest
     restart: always
     environment:
        POSTGRES_USER: amine
        POSTGRES_PASSWORD: mastouri
        POSTGRES_DB: my_db
-    volumes:
-      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amine -d my_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - backend  
 
@@ -89,5 +94,5 @@ networks:
   backend:
   frontend:
 
-volumes:
-  pg_data:  
+
+    
