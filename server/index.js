@@ -18,11 +18,18 @@ const pgClient = new Pool({
   password: keys.pgPassword,
   port: keys.pgPort
 });
-pgClient.on('error', () => console.log('Lost PG connection'));
+pgClient
+  .connect()
+  .then(() => console.log('Connected to PostgreSQL'))
+  .catch(err => console.log('Error connecting to PostgreSQL:', err));
 
 pgClient
-  .query('CREATE TABLE IF NOT EXISTS values (number INT)')
-  .catch(err => console.log(err));
+  .query('CREATE TABLE IF NOT EXISTS "values" (number INT)')
+  .then(() => console.log('Table "values" created or already exists'))
+  .catch(err => {
+    console.error('Error creating table:', err.message);
+    console.error('Stack trace:', err.stack);
+  });
 
 // Redis Client Setup
 const redis = require('redis');
@@ -40,7 +47,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/values/all', async (req, res) => {
-  const values = await pgClient.query('SELECT * from values');
+  const values = await pgClient.query('SELECT * from "values"');
 
   res.send(values.rows);
 });
@@ -50,17 +57,40 @@ app.get('/values/current', async (req, res) => {
     res.send(values);
   });
 });
+app.get('/values', async (req, res) => {
+  try {
+    // Fetch all values from PostgreSQL
+    const pgValues = await pgClient.query('SELECT * FROM "values"');
 
+    // Fetch all current values from Redis
+    redisClient.hgetall('values', (err, redisValues) => {
+      if (err) {
+        return res.status(500).send('Error fetching values from Redis');
+      }
+
+      // Combine data from PostgreSQL and Redis
+      res.send({
+        postgres: pgValues.rows,
+        redis: redisValues,
+      });
+    });
+  } catch (err) {
+    console.error('Error fetching values:', err.message);
+    res.status(500).send('Error fetching values');
+  }
+});
 app.post('/values', async (req, res) => {
   const index = req.body.index;
 
   if (parseInt(index) > 40) {
+    const values = await pgClient.query('SELECT * from "values"');
+    console.log(values.rows);
     return res.status(422).send('Index too high');
   }
 
   redisClient.hset('values', index, 'Nothing yet!');
   redisPublisher.publish('insert', index);
-  pgClient.query('INSERT INTO values(number) VALUES($1)', [index]);
+  pgClient.query('INSERT INTO "values"(number) VALUES($1);', [index]);
 
   res.send({ working: true });
 });
